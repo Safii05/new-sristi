@@ -60,6 +60,8 @@ export interface TranslationSchema {
   activateCamera: string;
   dailyLog: string;
   exportCsv: string;
+  liveAttendanceLogs: string;
+  time: string;
   present: string;
   absent: string;
   late: string;
@@ -137,6 +139,8 @@ export const translations: Record<Language, TranslationSchema> = {
     activateCamera: "Activate Camera",
     dailyLog: "Daily Log",
     exportCsv: "Export CSV",
+    liveAttendanceLogs: "Live Attendance Logs",
+    time: "Time",
     present: "PRESENT",
     absent: "ABSENT",
     late: "LATE",
@@ -211,6 +215,8 @@ export const translations: Record<Language, TranslationSchema> = {
     activateCamera: "கேமராவைச் செயல்படுத்தவும்",
     dailyLog: "தினசரி பதிவு",
     exportCsv: "CSV ஐ ஏற்றுமதி செய்யவும்",
+    liveAttendanceLogs: "நேரடி வருகைப் பதிவுகள்",
+    time: "நேரம்",
     present: "வருகை",
     absent: "வராதவர்",
     late: "தாமதம்",
@@ -285,6 +291,8 @@ export const translations: Record<Language, TranslationSchema> = {
     activateCamera: "कैमरा चालू करें",
     dailyLog: "दैनिक लॉग",
     exportCsv: "CSV निर्यात करें",
+    liveAttendanceLogs: "लाइव उपस्थिति लॉग",
+    time: "समय",
     present: "उपस्थित",
     absent: "अनुपस्थित",
     late: "देरी",

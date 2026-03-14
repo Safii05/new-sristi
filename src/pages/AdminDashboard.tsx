@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -242,7 +242,7 @@ const AdminDashboard = ({ onLogout }: Props) => {
       {activePage === 'trainees' && <TraineesSection data={trainees} onAddTrainee={handleAddTrainee} onDeleteTrainee={handleDeleteTrainee} />}
       {activePage === 'farmTask' && <FarmTaskSection data={tasks} trainees={trainees} onUpdateTask={handleUpdateTaskStatus} onAddTask={handleAddTask} onDeleteTask={handleDeleteTask} />}
       {activePage === 'cropMonitoring' && <CropMonitoringSection data={crops} />}
-      {activePage === 'attendanceProduction' && <AttendanceProductionSection />}
+      {activePage === 'attendanceProduction' && <AttendanceProductionSection qrSession={qrSession} onGenerateQR={handleGenerateQR} analytics={attendanceAnalytics} />}
       {activePage === 'inventory' && <InventorySection data={inventory} />}
       {activePage === 'reports' && <ReportsSection />}
       {activePage === 'settings' && <AdminSettingsSection />}
@@ -909,10 +909,9 @@ const CropMonitoringSection = ({ data }: any) => {
   );
 };
 
-const AttendanceProductionSection = () => {
+const AttendanceProductionSection = ({ qrSession, onGenerateQR, analytics }: any) => {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<'scanner' | 'camera' | 'manual'>('scanner');
-  const [log, setLog] = useState([
+  const [log] = useState([
     { name: 'Arjun Das', time: '08:11 AM', method: 'QR Scan', status: 'Present' },
     { name: 'Priya Singh', time: '08:12 AM', method: 'QR Scan', status: 'Present' },
     { name: 'Rohan Mehra', time: '08:13 AM', method: 'QR Scan', status: 'Late' },
@@ -920,123 +919,62 @@ const AttendanceProductionSection = () => {
     { name: 'Vikram Patel', time: '08:15 AM', method: 'QR Scan', status: 'Present' },
     { name: 'Meera Kumari', time: '08:16 AM', method: 'QR Scan', status: 'Present' },
   ]);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [selectedTrainee, setSelectedTrainee] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Mock trainees for manual entry dropdown
-  const mockTrainees = [
-    { id: 1, name: 'Arjun Das' },
-    { id: 2, name: 'Priya Singh' },
-    { id: 3, name: 'Rohan Mehra' },
-    { id: 4, name: 'Sita Devi' },
-    { id: 5, name: 'Vikram Patel' },
-    { id: 6, name: 'Meera Kumari' },
-    { id: 7, name: 'Amit Sharma' },
-    { id: 8, name: 'Neha Gupta' },
-  ];
-
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTrainee) return;
-    
-    const newEntry = {
-      name: selectedTrainee,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      method: 'Manual',
-      status: 'Present'
-    };
-    
-    setLog([newEntry, ...log]);
-    setSuccessMsg(t.logSuccess);
-    setMode('scanner');
-    setTimeout(() => setSuccessMsg(''), 3000);
-  };
-
-  const activateCamera = async () => {
-    setMode('camera');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err) {
-      console.error("Camera error", err);
-      alert(t.cameraError);
-      setMode('scanner');
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach(track => track.stop());
-    }
-    setMode('scanner');
+  const attendanceChartData = {
+    labels: analytics?.dailyStats?.map((s: any) => s.date.split('T')[0]).reverse() || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    datasets: [{ 
+      label: 'Attendance Count',
+      data: analytics?.dailyStats?.map((s: any) => s.count).reverse() || [95, 88, 92, 90, 85], 
+      backgroundColor: '#10b981', 
+      borderRadius: 8 
+    }]
   };
 
   return (
     <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 2fr', gap: '2rem' }}>
-      {/* Left Column: Check-in & Stats */}
+      {/* Left Column: QR Generation */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div className="card" style={{ textAlign: 'center', minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
-          <h3 className="text-lg font-bold mb-8">{t.traineeCheckIn}</h3>
+        <div className="card" style={{ textAlign: 'center', minHeight: '400px', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '2rem' }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#dcfce7', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+            <Plus size={32} />
+          </div>
+          <h3 className="text-xl font-black mb-4">Attendance Session</h3>
+          <p className="text-slate-500 mb-8">{t.qrInstruction}</p>
           
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            {mode === 'scanner' && (
-              <>
-                <div className="qr-scanner-mockup">
-                  <div className="qr-inner">
-                    {[...Array(16)].map((_, i) => <div key={i} className="qr-block"></div>)}
-                  </div>
-                  <div className="qr-line"></div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
+            {!qrSession ? (
+              <button 
+                className="btn btn-primary" 
+                onClick={onGenerateQR}
+                style={{ background: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '1rem 2rem' }}
+              >
+                <Plus size={20} />
+                Generate Attendance QR
+              </button>
+            ) : (
+              <div style={{ width: '100%' }}>
+                <div style={{ background: 'white', padding: '1.5rem', borderRadius: '1rem', border: '4px solid #10b981', boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.2)', display: 'inline-block', marginBottom: '1.5rem' }}>
+                  <QRCodeSVG value={qrSession.token} size={200} />
                 </div>
-                {successMsg && <div style={{ color: '#059669', fontWeight: 700, marginBottom: '1rem' }} className="fade-in">{successMsg}</div>}
-                <p className="text-slate-500 text-sm mb-8 px-8">{t.qrInstruction}</p>
-                <div className="btn-group-row">
-                  <button onClick={() => setMode('manual')} className="btn btn-secondary">{t.manualEntry}</button>
-                  <button onClick={activateCamera} className="btn btn-primary" style={{ background: '#059669' }}>{t.activateCamera}</button>
+                <div style={{ color: '#10b981', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <Clock size={20} />
+                  <span>Expires at {new Date(qrSession.expiresAt).toLocaleTimeString()}</span>
                 </div>
-              </>
-            )}
-
-            {mode === 'camera' && (
-              <div className="fade-in">
-                <div className="qr-scanner-mockup" style={{ padding: 0, overflow: 'hidden', background: '#000' }}>
-                  <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <button onClick={stopCamera} className="btn btn-secondary">{t.back}</button>
+                <button 
+                  className="btn-outline" 
+                  onClick={onGenerateQR}
+                  style={{ marginTop: '1.5rem' }}
+                >
+                  Regenerate QR
+                </button>
               </div>
-            )}
-
-            {mode === 'manual' && (
-              <form onSubmit={handleManualSubmit} className="fade-in" style={{ padding: '0 2rem' }}>
-                <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.875rem' }}>{t.selectTrainee}</label>
-                  <select 
-                    value={selectedTrainee} 
-                    onChange={(e) => setSelectedTrainee(e.target.value)}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
-                    required
-                  >
-                    <option value="">-- {t.selectTrainee} --</option>
-                    {mockTrainees.map((tr: any) => (
-                      <option key={tr.id} value={tr.name}>{tr.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="btn-group-row">
-                  <button type="button" onClick={() => setMode('scanner')} className="btn btn-secondary">{t.back}</button>
-                  <button type="submit" className="btn btn-primary" style={{ background: '#059669' }}>{t.submit}</button>
-                </div>
-              </form>
             )}
           </div>
         </div>
 
         <div className="attendance-summary-grid">
           <div className="summary-card">
-            <span className="summary-val text-success">{128 + log.filter(l => l.method === 'Manual').length}</span>
+            <span className="summary-val text-success">128</span>
             <span className="summary-label">{t.present}</span>
           </div>
           <div className="summary-card">
@@ -1050,40 +988,50 @@ const AttendanceProductionSection = () => {
         </div>
       </div>
 
-      {/* Right Column: Daily Log */}
-      <div className="card" style={{ padding: '2rem' }}>
-        <div className="daily-log-header">
-          <h3 className="text-lg font-black">{t.dailyLog} — 14/3/2026</h3>
-          <a href="#" className="export-csv">
-            <Plus size={16} style={{ transform: 'rotate(45deg)' }} /> {/* Simulated Export Icon */}
-            {t.exportCsv}
-          </a>
+      {/* Right Column: Live Logs & Analytics */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="card" style={{ height: '300px' }}>
+          <h3 className="text-lg font-bold mb-6">{t.attendanceAnalytics}</h3>
+          <div style={{ height: '200px' }}>
+            <Bar 
+              data={attendanceChartData}
+              options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }}
+            />
+          </div>
         </div>
 
-        <table style={{ background: 'white' }}>
-          <thead>
-            <tr>
-              <th style={{ background: 'transparent' }}>{t.trainee}</th>
-              <th style={{ background: 'transparent' }}>{t.checkIn}</th>
-              <th style={{ background: 'transparent' }}>{t.method}</th>
-              <th style={{ background: 'transparent' }}>{t.status}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {log.map((row: any, i: number) => (
-              <tr key={i} className="fade-in">
-                <td style={{ padding: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{row.name}</td>
-                <td style={{ padding: '1.25rem', color: '#64748b', fontSize: '0.875rem' }}>{row.time}</td>
-                <td style={{ padding: '1.25rem', color: '#64748b', fontSize: '0.875rem' }}>{row.method}</td>
-                <td style={{ padding: '1.25rem' }}>
-                  <span className={`badge ${row.status === 'Present' ? 'badge-success' : 'badge-warning'}`} style={{ padding: '0.35rem 0.85rem' }}>
-                    {row.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="card" style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="font-bold">{t.liveAttendanceLogs}</h3>
+            <span className="badge badge-success">Live Updates</span>
+          </div>
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <table style={{ width: '100%' }}>
+              <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 10 }}>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid #f1f5f9' }}>
+                  <th style={{ padding: '1rem', background: 'transparent' }}>{t.name}</th>
+                  <th style={{ padding: '1rem', background: 'transparent' }}>{t.time}</th>
+                  <th style={{ padding: '1rem', background: 'transparent' }}>{t.method}</th>
+                  <th style={{ padding: '1rem', background: 'transparent' }}>{t.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {log.map((row, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #f8fafc' }}>
+                    <td style={{ padding: '1rem', fontWeight: 600 }}>{row.name}</td>
+                    <td style={{ padding: '1rem', color: '#64748b' }}>{row.time}</td>
+                    <td style={{ padding: '1rem' }}><span style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#f1f5f9', borderRadius: '0.5rem' }}>{row.method}</span></td>
+                    <td style={{ padding: '1rem' }}>
+                      <span className={`badge ${row.status === 'Present' ? 'badge-success' : 'badge-warning'}`}>
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
