@@ -7,10 +7,10 @@ export const traineesData = [
 ];
 
 export const tasksData = [
-  { title: "Soil Preparation", zone: "Zone A", urgency: "Urgent", status: "In Progress" },
-  { title: "Organic Spray", zone: "Zone C", urgency: "Medium", status: "Pending" },
-  { title: "Seed Sowing", zone: "Zone B", urgency: "Low", status: "Completed" },
-  { title: "Irrigation Check", zone: "General", urgency: "Urgent", status: "In Progress" },
+  { id: 1, title: "Soil Preparation", zone: "Zone A", urgency: "Urgent", status: "In Progress", scheduled_date: "2026-03-14", assignee: "Arjun Das" },
+  { id: 2, title: "Organic Spray", zone: "Zone C", urgency: "Medium", status: "Pending", scheduled_date: "2026-03-14", assignee: "Priya Singh" },
+  { id: 3, title: "Seed Sowing", zone: "Zone B", urgency: "Low", status: "Completed", scheduled_date: "2026-03-13", assignee: "Rohan Mehra" },
+  { id: 4, title: "Irrigation Check", zone: "General", urgency: "Urgent", status: "In Progress", scheduled_date: "2026-03-15", assignee: "Sita Devi" },
 ];
 
 export const cropStatusData = [

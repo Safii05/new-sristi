@@ -554,3 +554,104 @@ td {
 .text-slate-500 { color: #64748b; }
 .text-slate-800 { color: #1e293b; }
 .italic { font-style: italic; }
+
+/* Attendance Page Specifics */
+.qr-scanner-mockup {
+  width: 260px;
+  height: 260px;
+  border: 4px solid var(--primary);
+  border-radius: 2rem;
+  margin: 0 auto 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: white;
+}
+
+.qr-inner {
+  width: 200px;
+  height: 200px;
+  border: 2px dashed #e2e8f0;
+  border-radius: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 20px;
+}
+
+.qr-block {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.qr-line {
+  position: absolute;
+  top: 80px;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+}
+
+.attendance-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.summary-card {
+  text-align: center;
+  padding: 1rem;
+  background: white;
+  border-radius: 1.25rem;
+  border: 1px solid #f1f5f9;
+}
+
+.summary-val {
+  font-size: 1.5rem;
+  font-weight: 900;
+  display: block;
+  margin-bottom: 0px;
+}
+
+.summary-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.text-success { color: #10b981; }
+.text-danger { color: #ef4444; }
+.text-warning { color: #f59e0b; }
+
+.btn-group-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.daily-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.export-csv {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-decoration: none;
+}

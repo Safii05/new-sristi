@@ -71,19 +71,19 @@ router.get('/tasks', async (req, res) => {
 });
 
 router.post('/tasks', async (req, res) => {
-  const { title, zone, urgency, status } = req.body;
+  const { title, zone, urgency, status, scheduled_date, assignee } = req.body;
   try {
-    const [result] = await pool.query('INSERT INTO farm_tasks (title, zone, urgency, status) VALUES (?, ?, ?, ?)', [title, zone, urgency, status]);
-    res.json({ id: result.insertId, title, zone, urgency, status });
+    const [result] = await pool.query('INSERT INTO farm_tasks (title, zone, urgency, status, scheduled_date, assignee) VALUES (?, ?, ?, ?, ?, ?)', [title, zone, urgency, status, scheduled_date, assignee]);
+    res.json({ id: result.insertId, title, zone, urgency, status, scheduled_date, assignee });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 router.put('/tasks/:id', async (req, res) => {
-  const { title, zone, urgency, status } = req.body;
+  const { title, zone, urgency, status, scheduled_date, assignee } = req.body;
   try {
-    await pool.query('UPDATE farm_tasks SET title = ?, zone = ?, urgency = ?, status = ? WHERE id = ?', [title, zone, urgency, status, req.params.id]);
+    await pool.query('UPDATE farm_tasks SET title = ?, zone = ?, urgency = ?, status = ?, scheduled_date = ?, assignee = ? WHERE id = ?', [title, zone, urgency, status, scheduled_date, assignee, req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

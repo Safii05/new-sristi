@@ -25,6 +25,7 @@ export const getTrainees = () => api.get('/trainees');
 export const addTrainee = (data: any) => api.post('/trainees', data);
 export const getTasks = () => api.get('/tasks');
 export const addTask = (data: any) => api.post('/tasks', data);
+export const updateTask = (id: number, data: any) => api.put(`/tasks/${id}`, data);
 export const getCrops = () => api.get('/crops');
 export const addCrop = (data: any) => api.post('/crops', data);
 export const getAttendanceProduction = () => api.get('/attendance-production');

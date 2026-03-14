@@ -54,6 +54,24 @@ export interface TranslationSchema {
   taskCompletion: string;
   attendanceAnalytics: string;
   dummySettings: string;
+  traineeCheckIn: string;
+  qrInstruction: string;
+  manualEntry: string;
+  activateCamera: string;
+  dailyLog: string;
+  exportCsv: string;
+  present: string;
+  absent: string;
+  late: string;
+  trainee: string;
+  checkIn: string;
+  method: string;
+  qrScan: string;
+  cameraError: string;
+  selectTrainee: string;
+  submit: string;
+  back: string;
+  logSuccess: string;
   placeholderResults: string;
 }
 
@@ -112,7 +130,25 @@ export const translations: Record<Language, TranslationSchema> = {
     taskCompletion: "Task Completion Statistics",
     attendanceAnalytics: "Attendance Analytics",
     dummySettings: "Configure your profile and system preferences here.",
-    placeholderResults: "Results will appear once an image is uploaded and processed."
+    placeholderResults: "Results will appear once an image is uploaded and processed.",
+    traineeCheckIn: "Trainee Check-in",
+    qrInstruction: "Position QR code within the frame to automatically log attendance.",
+    manualEntry: "Manual Entry",
+    activateCamera: "Activate Camera",
+    dailyLog: "Daily Log",
+    exportCsv: "Export CSV",
+    present: "PRESENT",
+    absent: "ABSENT",
+    late: "LATE",
+    trainee: "TRAINEE",
+    checkIn: "CHECK-IN",
+    method: "METHOD",
+    qrScan: "QR Scan",
+    cameraError: "Camera access denied or not available.",
+    selectTrainee: "Select Trainee",
+    submit: "Submit",
+    back: "Back",
+    logSuccess: "Attendance logged successfully!"
   },
   ta: {
     title: "பண்ணை செயல்பாடுகள் மற்றும் பயிற்சி",
@@ -168,7 +204,25 @@ export const translations: Record<Language, TranslationSchema> = {
     taskCompletion: "பணி நிறைவு புள்ளிவிவரங்கள்",
     attendanceAnalytics: "வருகை பகுப்பாய்வு",
     dummySettings: "உங்கள் சுயவிவரம் மற்றும் கணினி விருப்பங்களை இங்கே உள்ளமைக்கவும்.",
-    placeholderResults: "படம் பதிவேற்றம் செய்யப்பட்டு செயலாக்கப்படும் போது முடிவுகள் தோன்றும்."
+    placeholderResults: "படம் பதிவேற்றம் செய்யப்பட்டு செயலாக்கப்படும் போது முடிவுகள் தோன்றும்.",
+    traineeCheckIn: "பயிற்சியாளர் வருகை பதிவு",
+    qrInstruction: "தானாக வருகையைப் பதிவு செய்ய சட்டத்திற்குள் QR குறியீட்டை வைக்கவும்.",
+    manualEntry: "கைமுறை பதிவு",
+    activateCamera: "கேமராவைச் செயல்படுத்தவும்",
+    dailyLog: "தினசரி பதிவு",
+    exportCsv: "CSV ஐ ஏற்றுமதி செய்யவும்",
+    present: "வருகை",
+    absent: "வராதவர்",
+    late: "தாமதம்",
+    trainee: "பயிற்சியாளர்",
+    checkIn: "செக்-இன்",
+    method: "முறை",
+    qrScan: "QR ஸ்கேன்",
+    cameraError: "கேமரா அணுகல் மறுக்கப்பட்டது அல்லது கிடைக்கவில்லை.",
+    selectTrainee: "பயிற்சியாளரைத் தேர்ந்தெடுக்கவும்",
+    submit: "சமர்ப்பிக்கவும்",
+    back: "பின்செல்",
+    logSuccess: "வருகை வெற்றிகரமாக பதிவு செய்யப்பட்டது!"
   },
   hi: {
     title: "कृषि संचालन और प्रशिक्षण",
@@ -224,6 +278,24 @@ export const translations: Record<Language, TranslationSchema> = {
     taskCompletion: "कार्य पूर्णता आँकड़े",
     attendanceAnalytics: "उपस्थिति विश्लेषण",
     dummySettings: "अपनी प्रोफ़ाइल और सिस्टम प्राथमिकताओं को यहाँ कॉन्फ़िगर करें।",
-    placeholderResults: "छवि अपलोड होने और संसाधित होने के बाद परिणाम दिखाई देंगे।"
+    placeholderResults: "छवि अपलोड होने और संसाधित होने के बाद परिणाम दिखाई देंगे।",
+    traineeCheckIn: "प्रशिक्षु चेक-इन",
+    qrInstruction: "उपस्थिति स्वचालित रूप से दर्ज करने के लिए फ्रेम के भीतर क्यूआर कोड रखें।",
+    manualEntry: "मैनुअल प्रविष्टि",
+    activateCamera: "कैमरा चालू करें",
+    dailyLog: "दैनिक लॉग",
+    exportCsv: "CSV निर्यात करें",
+    present: "उपस्थित",
+    absent: "अनुपस्थित",
+    late: "देरी",
+    trainee: "प्रशिक्षु",
+    checkIn: "चेक-इन",
+    method: "तरीका",
+    qrScan: "QR स्कैन",
+    cameraError: "कैमरा एक्सेस अस्वीकार कर दिया गया या उपलब्ध नहीं है।",
+    selectTrainee: "प्रशिक्षु चुनें",
+    submit: "सबमिट करें",
+    back: "पीछे",
+    logSuccess: "उपस्थिति सफलतापूर्वक दर्ज की गई!"
   }
 };

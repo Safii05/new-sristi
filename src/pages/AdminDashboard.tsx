@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
   ClipboardList, 
   Eye, 
-  BarChart3, 
-  Package, 
+  Package,
   PieChart, 
   Settings as SettingsIcon,
   TrendingUp,
@@ -19,7 +18,8 @@ import {
   MoreVertical,
   Filter,
   Calendar,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 import { 
   Chart as ChartJS, 
@@ -41,10 +41,9 @@ import {
   traineesData as mockTrainees, 
   tasksData as mockTasks, 
   cropStatusData as mockCrops, 
-  attendanceProductionData as mockAttendanceProduction, 
   inventoryData as mockInventory
 } from '../services/mockData';
-import { getDashboardStats, getTrainees, getTasks, getCrops, getAttendanceProduction, getInventory } from '../services/api';
+import { getDashboardStats, getTrainees, addTrainee, getTasks, addTask, updateTask, getCrops, getInventory } from '../services/api';
 
 // Register ChartJS components
 ChartJS.register(
@@ -71,25 +70,22 @@ const AdminDashboard = ({ onLogout }: Props) => {
   const [trainees, setTrainees] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [crops, setCrops] = useState<any[]>([]);
-  const [attProd, setAttProd] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [s, t, tk, c, ap, inv] = await Promise.all([
+        const [s, t, tk, c, inv] = await Promise.all([
           getDashboardStats(),
           getTrainees(),
           getTasks(),
           getCrops(),
-          getAttendanceProduction(),
           getInventory()
         ]);
         setStats(s.data);
         setTrainees(t.data);
         setTasks(tk.data);
         setCrops(c.data);
-        setAttProd(ap.data);
         setInventory(inv.data);
       } catch (err) {
         console.error("Failed to fetch admin data", err);
@@ -103,7 +99,7 @@ const AdminDashboard = ({ onLogout }: Props) => {
     { id: 'trainees', label: t.trainees, icon: Users },
     { id: 'farmTask', label: t.farmTask, icon: ClipboardList },
     { id: 'cropMonitoring', label: t.cropMonitoring, icon: Eye },
-    { id: 'attendanceProduction', label: t.attendanceProduction, icon: BarChart3 },
+    { id: 'attendanceProduction', label: t.attendance, icon: Calendar },
     { id: 'inventory', label: t.inventory, icon: Package },
     { id: 'reports', label: t.reports, icon: PieChart },
     { id: 'settings', label: t.settings, icon: SettingsIcon },
@@ -111,19 +107,59 @@ const AdminDashboard = ({ onLogout }: Props) => {
     { id: 'logout', label: t.logout, icon: LogOut },
   ];
 
+  const handleUpdateTaskStatus = async (taskId: number, newStatus: string) => {
+    // Optimistic update
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+    setTasks(updatedTasks);
+
+    try {
+      const taskToUpdate = tasks.find(t => t.id === taskId);
+      if (taskToUpdate) {
+        await updateTask(taskId, { ...taskToUpdate, status: newStatus });
+      }
+    } catch (err) {
+      console.error("Failed to update task status", err);
+      // Revert on error
+      const originalTasks = await getTasks();
+      setTasks(originalTasks.data);
+    }
+  };
+
+  const handleAddTask = async (task: any) => {
+    try {
+      const res = await addTask(task);
+      setTasks([...tasks, res.data]);
+    } catch (err) {
+      console.error("Failed to add task", err);
+      const id = Math.max(0, ...tasks.map(t => t.id)) + 1;
+      setTasks([...tasks, { ...task, id }]);
+    }
+  };
+
+  const handleAddTrainee = async (trainee: any) => {
+    try {
+      const res = await addTrainee(trainee);
+      setTrainees([...trainees, res.data]);
+    } catch (err) {
+      console.error("Failed to add trainee", err);
+      const id = (trainees.length + 1).toString().padStart(3, '0');
+      setTrainees([...trainees, { ...trainee, id, efficiency: '90%', status: 'Active' }]);
+    }
+  };
+
   return (
-    <DashboardLayout 
-      menuItems={menuItems} 
-      activePage={activePage} 
-      setActivePage={setActivePage} 
+    <DashboardLayout
+      menuItems={menuItems}
+      activePage={activePage}
+      setActivePage={setActivePage}
       onLogout={onLogout}
       userType="Admin"
     >
       {activePage === 'dashboard' && <AdminDashboardHome stats={stats} />}
-      {activePage === 'trainees' && <TraineesSection data={trainees.length > 0 ? trainees : mockTrainees} />}
-      {activePage === 'farmTask' && <FarmTaskSection data={tasks.length > 0 ? tasks : mockTasks} />}
+      {activePage === 'trainees' && <TraineesSection data={trainees.length > 0 ? trainees : mockTrainees} onAddTrainee={handleAddTrainee} />}
+      {activePage === 'farmTask' && <FarmTaskSection data={tasks.length > 0 ? tasks : mockTasks} trainees={trainees.length > 0 ? trainees : mockTrainees} onUpdateTask={handleUpdateTaskStatus} onAddTask={handleAddTask} />}
       {activePage === 'cropMonitoring' && <CropMonitoringSection data={crops.length > 0 ? crops : mockCrops} />}
-      {activePage === 'attendanceProduction' && <AttendanceProductionSection data={attProd.length > 0 ? attProd : mockAttendanceProduction} />}
+      {activePage === 'attendanceProduction' && <AttendanceProductionSection />}
       {activePage === 'inventory' && <InventorySection data={inventory.length > 0 ? inventory : mockInventory} />}
       {activePage === 'reports' && <ReportsSection />}
       {activePage === 'settings' && <AdminSettingsSection />}
@@ -177,7 +213,9 @@ const AdminDashboardHome = ({ stats }: any) => {
   );
 };
 
-const TraineesSection = ({ data }: any) => {
+const TraineesSection = ({ data, onAddTrainee }: any) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newTrainee, setNewTrainee] = useState({ name: '', group_name: 'Organic Farming', status: 'Active' });
 
   // Helper to get initials
   const getInitials = (name: string) => {
@@ -186,11 +224,18 @@ const TraineesSection = ({ data }: any) => {
 
   // Helper for skill level based on mock efficiency
   const getSkillInfo = (eff: string) => {
-    const val = parseInt(eff);
+    const val = parseInt(eff) || 0;
     if (val >= 95) return { label: 'Expert', class: 'skill-expert' };
     if (val >= 85) return { label: 'Advanced', class: 'skill-advanced' };
     if (val >= 75) return { label: 'Intermediate', class: 'skill-intermediate' };
     return { label: 'Beginner', class: 'skill-beginner' };
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onAddTrainee(newTrainee);
+    setIsModalOpen(false);
+    setNewTrainee({ name: '', group_name: 'Organic Farming', status: 'Active' });
   };
 
   return (
@@ -201,11 +246,67 @@ const TraineesSection = ({ data }: any) => {
           <Search className="icon" size={20} />
           <input type="text" placeholder="Search trainees by name or program..." />
         </div>
-        <button className="btn-add-trainee">
+        <button className="btn-add-trainee" onClick={() => setIsModalOpen(true)}>
           <Plus size={20} />
           Add New Trainee
         </button>
       </div>
+
+      {/* Add Trainee Modal */}
+      {isModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div className="card shadow-lg fade-in" style={{ width: '100%', maxWidth: '450px', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h3 className="font-black text-xl">Add New Trainee</h3>
+              <button onClick={() => setIsModalOpen(false)}><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="text-sm font-bold block mb-2">Full Name</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. Rahul Sharma"
+                  value={newTrainee.name}
+                  onChange={(e) => setNewTrainee({ ...newTrainee, name: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label className="text-sm font-bold block mb-2">Program / Group</label>
+                <select 
+                  value={newTrainee.group_name}
+                  onChange={(e) => setNewTrainee({ ...newTrainee, group_name: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                >
+                  <option value="Organic Farming">Organic Farming</option>
+                  <option value="Dairy Management">Dairy Management</option>
+                  <option value="Poultry Farming">Poultry Farming</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '2rem' }}>
+                <label className="text-sm font-bold block mb-2">Initial Status</label>
+                <select 
+                  value={newTrainee.status}
+                  onChange={(e) => setNewTrainee({ ...newTrainee, status: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Training">Training</option>
+                  <option value="On Leave">On Leave</option>
+                </select>
+              </div>
+
+              <button className="btn btn-primary w-100" type="submit" style={{ padding: '1rem', background: '#10b981' }}>
+                Add Trainee
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Table Card */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -267,7 +368,23 @@ const TraineesSection = ({ data }: any) => {
   );
 };
 
-const FarmTaskSection = ({ data }: any) => {
+const FarmTaskSection = ({ data, trainees, onUpdateTask, onAddTask }: any) => {
+  const [viewMode, setViewMode] = useState<'kanban' | 'schedule'>('kanban');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({ priority: '', assignee: '' });
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // New Task State
+  const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+  const [newTask, setNewTask] = useState({ 
+    title: '', 
+    zone: 'Zone A', 
+    urgency: 'Medium', 
+    status: 'Pending', 
+    assignee: '', 
+    scheduled_date: new Date().toISOString().split('T')[0] 
+  });
+
   const columns = [
     { title: 'To Do', status: 'Pending' },
     { title: 'In Progress', status: 'In Progress' },
@@ -278,71 +395,307 @@ const FarmTaskSection = ({ data }: any) => {
     return name.split(' ').map((n: string) => n[0]).join('').toUpperCase();
   };
 
+  const onDragStart = (e: React.DragEvent, taskId: number) => {
+    e.dataTransfer.setData('taskId', taskId.toString());
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (e: React.DragEvent, newStatus: string) => {
+    const taskId = parseInt(e.dataTransfer.getData('taskId'));
+    onUpdateTask(taskId, newStatus);
+  };
+
+  const handleAddTaskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onAddTask(newTask);
+    setIsNewTaskOpen(false);
+    setNewTask({ 
+      title: '', 
+      zone: 'Zone A', 
+      urgency: 'Medium', 
+      status: 'Pending', 
+      assignee: '', 
+      scheduled_date: new Date().toISOString().split('T')[0] 
+    });
+  };
+
+  const filteredTasks = data.filter((task: any) => {
+    const priorityMatch = !filters.priority || task.urgency === filters.priority;
+    const assigneeMatch = !filters.assignee || task.assignee === filters.assignee;
+    return priorityMatch && assigneeMatch;
+  });
+
+  const scheduledTasks = filteredTasks.filter((task: any) => {
+    if (!task.scheduled_date) return false;
+    const taskDate = task.scheduled_date.split('T')[0];
+    return taskDate === selectedDate;
+  });
+
+  const assignees = Array.from(new Set(trainees.map((tr: any) => tr.name))) as string[];
+
   return (
     <div className="fade-in">
       {/* Top Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', position: 'relative' }}>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn-outline">
+          <button 
+            className={`btn-outline ${filterOpen ? 'active' : ''}`}
+            onClick={() => setFilterOpen(!filterOpen)}
+            style={{ borderColor: filterOpen ? 'var(--primary)' : '#e2e8f0', background: filterOpen ? '#ecfdf5' : 'white' }}
+          >
             <Filter size={18} />
             Filter
           </button>
-          <button className="btn-outline">
+          <button 
+            className={`btn-outline ${viewMode === 'schedule' ? 'active' : ''}`}
+            onClick={() => setViewMode(viewMode === 'kanban' ? 'schedule' : 'kanban')}
+            style={{ borderColor: viewMode === 'schedule' ? 'var(--primary)' : '#e2e8f0', background: viewMode === 'schedule' ? '#ecfdf5' : 'white' }}
+          >
             <Calendar size={18} />
-            Schedule
+            {viewMode === 'kanban' ? 'Schedule' : 'Board View'}
           </button>
         </div>
-        <button className="btn-add-trainee">
+        
+
+        {filterOpen && (
+          <div className="card shadow-lg" style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, marginTop: '0.5rem', width: '300px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h4 className="font-bold">Filters</h4>
+              <button onClick={() => setFilterOpen(false)}><X size={18} /></button>
+            </div>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label className="text-sm font-bold block mb-2">Priority</label>
+              <select 
+                value={filters.priority} 
+                onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}
+              >
+                <option value="">All Priorities</option>
+                <option value="Urgent">Urgent</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label className="text-sm font-bold block mb-2">Assignee</label>
+              <select 
+                value={filters.assignee} 
+                onChange={(e) => setFilters({ ...filters, assignee: e.target.value })}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}
+              >
+                <option value="">All Assignees</option>
+                {assignees.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+
+            <button 
+              className="btn btn-secondary text-sm w-100" 
+              onClick={() => { setFilters({ priority: '', assignee: '' }); setFilterOpen(false); }}
+              style={{ padding: '0.5rem' }}
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
+
+        <button className="btn-add-trainee" onClick={() => setIsNewTaskOpen(true)}>
           <Plus size={20} />
           New Task
         </button>
       </div>
 
-      {/* Kanban Board */}
-      <div className="kanban-board">
-        {columns.map((col) => {
-          const tasks = data.filter((t: any) => t.status === col.status);
-          return (
-            <div key={col.status} className="kanban-column">
-              <div className="kanban-header">
-                <div className="kanban-title">
-                  {col.title}
-                  <span className="count-badge">{tasks.length}</span>
-                </div>
-                <button style={{ background: 'none', color: '#94a3b8' }}>
-                  <Plus size={20} />
-                </button>
+      {/* New Task Modal */}
+      {isNewTaskOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
+          <div className="card shadow-lg fade-in" style={{ width: '100%', maxWidth: '500px', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h3 className="font-black text-xl">Create New Task</h3>
+              <button onClick={() => setIsNewTaskOpen(false)}><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleAddTaskSubmit}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label className="text-sm font-bold block mb-2">Task Title</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. Organic Spray Zone C"
+                  value={newTask.title}
+                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                />
               </div>
 
-              <div className="column-content">
-                {tasks.map((task: any, i: number) => (
-                  <div key={i} className="task-card">
-                    <span className={`priority-badge priority-${task.urgency.toLowerCase()}`}>
-                      {task.urgency}
-                    </span>
-                    <h4 className="task-name">{task.title}</h4>
-                    <div className="task-meta">
-                      <Clock size={16} />
-                      <span>{task.status === 'Completed' ? 'Yesterday' : 'Today, 02:00 PM'}</span>
-                    </div>
-                    <div className="task-footer">
-                      <div className="avatar assignee-avatar" style={{ background: col.status === 'Completed' ? '#dcfce7' : '#f1f5f9', color: col.status === 'Completed' ? '#15a34a' : '#64748b' }}>
-                        {getInitials(task.assignee || "Rohan Mehra")}
-                      </div>
-                      <span className="assignee-name">{task.assignee || "Rohan Mehra"}</span>
-                    </div>
-                  </div>
-                ))}
-                {tasks.length === 0 && (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#cbd5e1', border: '2px dashed #f1f5f9', borderRadius: '1.25rem' }}>
-                    No tasks here
-                  </div>
-                )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <label className="text-sm font-bold block mb-2">Assignee</label>
+                  <select 
+                    required
+                    value={newTask.assignee}
+                    onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                  >
+                    <option value="">Select Trainee</option>
+                    {assignees.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-2">Scheduled Date</label>
+                  <input 
+                    type="date" 
+                    required
+                    value={newTask.scheduled_date}
+                    onChange={(e) => setNewTask({ ...newTask, scheduled_date: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                  />
+                </div>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
+                <div>
+                  <label className="text-sm font-bold block mb-2">Priority</label>
+                  <select 
+                    value={newTask.urgency}
+                    onChange={(e) => setNewTask({ ...newTask, urgency: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                  >
+                    <option value="Urgent">Urgent</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-bold block mb-2">Zone</label>
+                  <select 
+                    value={newTask.zone}
+                    onChange={(e) => setNewTask({ ...newTask, zone: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                  >
+                    <option value="Zone A">Zone A</option>
+                    <option value="Zone B">Zone B</option>
+                    <option value="Zone C">Zone C</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+              </div>
+
+              <button className="btn btn-primary w-100" type="submit" style={{ padding: '1rem' }}>
+                Create Task
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {viewMode === 'kanban' ? (
+        <div className="kanban-board">
+          {columns.map((col) => {
+            const tasks = filteredTasks.filter((t: any) => t.status === col.status);
+            return (
+              <div 
+                key={col.status} 
+                className="kanban-column"
+                onDragOver={onDragOver}
+                onDrop={(e) => onDrop(e, col.status)}
+              >
+                <div className="kanban-header">
+                  <div className="kanban-title">
+                    {col.title}
+                    <span className="count-badge">{tasks.length}</span>
+                  </div>
+                  <button style={{ background: 'none', color: '#94a3b8' }}>
+                    <Plus size={20} />
+                  </button>
+                </div>
+
+                <div className="column-content" style={{ minHeight: '500px' }}>
+                  {tasks.map((task: any, i: number) => (
+                    <div 
+                      key={task.id || i} 
+                      className="task-card"
+                      draggable
+                      onDragStart={(e) => onDragStart(e, task.id)}
+                      style={{ cursor: 'grab' }}
+                    >
+                      <span className={`priority-badge priority-${task.urgency.toLowerCase()}`}>
+                         {task.urgency}
+                      </span>
+                      <h4 className="task-name">{task.title}</h4>
+                      <div className="task-meta">
+                        <Clock size={16} />
+                        <span>{task.scheduled_date || (task.status === 'Completed' ? 'Yesterday' : 'Today')}</span>
+                      </div>
+                      <div className="task-footer">
+                        <div className="avatar assignee-avatar" style={{ background: col.status === 'Completed' ? '#dcfce7' : '#f1f5f9', color: col.status === 'Completed' ? '#15a34a' : '#64748b' }}>
+                          {getInitials(task.assignee || "Rohan Mehra")}
+                        </div>
+                        <span className="assignee-name">{task.assignee || "Rohan Mehra"}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {tasks.length === 0 && (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#cbd5e1', border: '2px dashed #f1f5f9', borderRadius: '1.25rem' }}>
+                      No tasks found
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="card fade-in" style={{ padding: '2rem' }}>
+          <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', alignItems: 'center' }}>
+            <h3 className="font-black text-xl">Schedule View</h3>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                style={{ padding: '0.5rem 1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', fontWeight: 700 }}
+              />
+              <span className="text-slate-500 font-bold">
+                {scheduledTasks.length} tasks planned for this day
+              </span>
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {scheduledTasks.length > 0 ? scheduledTasks.map((task: any, i: number) => (
+              <div key={i} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                  <div style={{ padding: '1rem', background: 'white', borderRadius: '1rem', minWidth: '100px', textAlign: 'center' }}>
+                    <span className="text-xs font-bold text-slate-400 block mb-1">STATUS</span>
+                    <span className={`badge ${task.status === 'Completed' ? 'badge-success' : 'badge-warning'}`}>{task.status}</span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">{task.title}</h4>
+                    <span className="text-sm text-slate-500">{task.zone} • {task.urgency} Priority</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <span className="block font-bold">{task.assignee}</span>
+                    <span className="text-xs text-slate-500">Assignee</span>
+                  </div>
+                  <div className="avatar" style={{ background: 'white' }}>{getInitials(task.assignee)}</div>
+                </div>
+              </div>
+            )) : (
+              <div style={{ padding: '4rem', textAlign: 'center', color: '#cbd5e1' }}>
+                <Calendar size={48} className="mx-auto mb-4" />
+                <p className="text-lg font-bold">No tasks scheduled for {selectedDate}</p>
+                <p>Try selecting another date or check the Board View.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -373,36 +726,182 @@ const CropMonitoringSection = ({ data }: any) => {
   );
 };
 
-const AttendanceProductionSection = ({ data }: any) => {
+const AttendanceProductionSection = () => {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState<'scanner' | 'camera' | 'manual'>('scanner');
+  const [log, setLog] = useState([
+    { name: 'Arjun Das', time: '08:11 AM', method: 'QR Scan', status: 'Present' },
+    { name: 'Priya Singh', time: '08:12 AM', method: 'QR Scan', status: 'Present' },
+    { name: 'Rohan Mehra', time: '08:13 AM', method: 'QR Scan', status: 'Late' },
+    { name: 'Sita Devi', time: '08:14 AM', method: 'QR Scan', status: 'Present' },
+    { name: 'Vikram Patel', time: '08:15 AM', method: 'QR Scan', status: 'Present' },
+    { name: 'Meera Kumari', time: '08:16 AM', method: 'QR Scan', status: 'Present' },
+  ]);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [selectedTrainee, setSelectedTrainee] = useState('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Mock trainees for manual entry dropdown
+  const mockTrainees = [
+    { id: 1, name: 'Arjun Das' },
+    { id: 2, name: 'Priya Singh' },
+    { id: 3, name: 'Rohan Mehra' },
+    { id: 4, name: 'Sita Devi' },
+    { id: 5, name: 'Vikram Patel' },
+    { id: 6, name: 'Meera Kumari' },
+    { id: 7, name: 'Amit Sharma' },
+    { id: 8, name: 'Neha Gupta' },
+  ];
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTrainee) return;
+    
+    const newEntry = {
+      name: selectedTrainee,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      method: 'Manual',
+      status: 'Present'
+    };
+    
+    setLog([newEntry, ...log]);
+    setSuccessMsg(t.logSuccess);
+    setMode('scanner');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const activateCamera = async () => {
+    setMode('camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera error", err);
+      alert(t.cameraError);
+      setMode('scanner');
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    setMode('scanner');
+  };
+
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Attendance</th>
-            <th>Production Yield</th>
-            <th>Quality</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row: any, i: number) => (
-            <tr key={i}>
-              <td>{row.date}</td>
-              <td style={{ fontWeight: 700 }}>{row.attendance}</td>
-              <td style={{ color: 'var(--secondary)', fontWeight: 700 }}>{row.yield}</td>
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                   <div style={{ flex: 1, height: '6px', background: '#f1f5f9', borderRadius: '3px' }}>
-                      <div style={{ width: `${parseFloat(row.quality) * 10}%`, height: '100%', background: '#6366f1', borderRadius: '3px' }}></div>
-                   </div>
-                   <span style={{ fontWeight: 800 }}>{row.quality}</span>
+    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 2fr', gap: '2rem' }}>
+      {/* Left Column: Check-in & Stats */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="card" style={{ textAlign: 'center', minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
+          <h3 className="text-lg font-bold mb-8">{t.traineeCheckIn}</h3>
+          
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            {mode === 'scanner' && (
+              <>
+                <div className="qr-scanner-mockup">
+                  <div className="qr-inner">
+                    {[...Array(16)].map((_, i) => <div key={i} className="qr-block"></div>)}
+                  </div>
+                  <div className="qr-line"></div>
                 </div>
-              </td>
+                {successMsg && <div style={{ color: '#059669', fontWeight: 700, marginBottom: '1rem' }} className="fade-in">{successMsg}</div>}
+                <p className="text-slate-500 text-sm mb-8 px-8">{t.qrInstruction}</p>
+                <div className="btn-group-row">
+                  <button onClick={() => setMode('manual')} className="btn btn-secondary">{t.manualEntry}</button>
+                  <button onClick={activateCamera} className="btn btn-primary" style={{ background: '#059669' }}>{t.activateCamera}</button>
+                </div>
+              </>
+            )}
+
+            {mode === 'camera' && (
+              <div className="fade-in">
+                <div className="qr-scanner-mockup" style={{ padding: 0, overflow: 'hidden', background: '#000' }}>
+                  <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <button onClick={stopCamera} className="btn btn-secondary">{t.back}</button>
+              </div>
+            )}
+
+            {mode === 'manual' && (
+              <form onSubmit={handleManualSubmit} className="fade-in" style={{ padding: '0 2rem' }}>
+                <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                  <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem', fontSize: '0.875rem' }}>{t.selectTrainee}</label>
+                  <select 
+                    value={selectedTrainee} 
+                    onChange={(e) => setSelectedTrainee(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}
+                    required
+                  >
+                    <option value="">-- {t.selectTrainee} --</option>
+                    {mockTrainees.map((tr: any) => (
+                      <option key={tr.id} value={tr.name}>{tr.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="btn-group-row">
+                  <button type="button" onClick={() => setMode('scanner')} className="btn btn-secondary">{t.back}</button>
+                  <button type="submit" className="btn btn-primary" style={{ background: '#059669' }}>{t.submit}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+
+        <div className="attendance-summary-grid">
+          <div className="summary-card">
+            <span className="summary-val text-success">{128 + log.filter(l => l.method === 'Manual').length}</span>
+            <span className="summary-label">{t.present}</span>
+          </div>
+          <div className="summary-card">
+            <span className="summary-val text-danger">12</span>
+            <span className="summary-label">{t.absent}</span>
+          </div>
+          <div className="summary-card">
+            <span className="summary-val text-warning">4</span>
+            <span className="summary-label">{t.late}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Column: Daily Log */}
+      <div className="card" style={{ padding: '2rem' }}>
+        <div className="daily-log-header">
+          <h3 className="text-lg font-black">{t.dailyLog} — 14/3/2026</h3>
+          <a href="#" className="export-csv">
+            <Plus size={16} style={{ transform: 'rotate(45deg)' }} /> {/* Simulated Export Icon */}
+            {t.exportCsv}
+          </a>
+        </div>
+
+        <table style={{ background: 'white' }}>
+          <thead>
+            <tr>
+              <th style={{ background: 'transparent' }}>{t.trainee}</th>
+              <th style={{ background: 'transparent' }}>{t.checkIn}</th>
+              <th style={{ background: 'transparent' }}>{t.method}</th>
+              <th style={{ background: 'transparent' }}>{t.status}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {log.map((row: any, i: number) => (
+              <tr key={i} className="fade-in">
+                <td style={{ padding: '1.25rem', fontWeight: 700, color: '#1e293b' }}>{row.name}</td>
+                <td style={{ padding: '1.25rem', color: '#64748b', fontSize: '0.875rem' }}>{row.time}</td>
+                <td style={{ padding: '1.25rem', color: '#64748b', fontSize: '0.875rem' }}>{row.method}</td>
+                <td style={{ padding: '1.25rem' }}>
+                  <span className={`badge ${row.status === 'Present' ? 'badge-success' : 'badge-warning'}`} style={{ padding: '0.35rem 0.85rem' }}>
+                    {row.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

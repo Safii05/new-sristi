@@ -45,7 +45,9 @@ const initDB = async () => {
         title VARCHAR(255) NOT NULL,
         zone VARCHAR(255),
         urgency VARCHAR(50),
-        status VARCHAR(50)
+        status VARCHAR(50),
+        scheduled_date DATE,
+        assignee VARCHAR(255)
       )
     `);
 
